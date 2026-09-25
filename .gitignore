@@ -1,0 +1,50 @@
+# Model weights
+*.pt
+*.pth
+*.bin
+*.ckpt
+*.safetensors
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Kaggle credentials
+.kaggle/
+kaggle.json
+
+# Local utility scripts (Windows only)
+start_translator.bat
+start_translator.ps1
+
+# Archives
+*.zip
+
+# Logs
+*.log
+flask_session/

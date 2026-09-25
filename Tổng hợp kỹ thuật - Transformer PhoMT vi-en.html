@@ -1,0 +1,269 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}</style><style>:root{color-scheme:light dark;--md-bg:#fff;--md-text:rgba(0,0,0,.8);--md-muted:rgba(0,0,0,.6);--md-fill:rgba(0,0,0,.04);--md-fill-strong:rgba(0,0,0,.06);--md-rule:rgba(0,0,0,.1);--md-rule-strong:rgba(0,0,0,.16);--md-link:hsl(210 100% 45%)}@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){--md-bg:#0d0d0d;--md-text:rgba(255,255,255,.85);--md-muted:rgba(255,255,255,.6);--md-fill:rgba(255,255,255,.06);--md-fill-strong:rgba(255,255,255,.09);--md-rule:rgba(255,255,255,.14);--md-rule-strong:rgba(255,255,255,.22);--md-link:hsl(210 100% 72%)}}:root[data-theme="dark"]{color-scheme:dark;--md-bg:#0d0d0d;--md-text:rgba(255,255,255,.85);--md-muted:rgba(255,255,255,.6);--md-fill:rgba(255,255,255,.06);--md-fill-strong:rgba(255,255,255,.09);--md-rule:rgba(255,255,255,.14);--md-rule-strong:rgba(255,255,255,.22);--md-link:hsl(210 100% 72%)}:root[data-theme="light"]{color-scheme:light}@media print{:root,:root[data-theme="dark"]{color-scheme:light;--md-bg:#fff;--md-text:rgba(0,0,0,.8);--md-muted:rgba(0,0,0,.6);--md-fill:rgba(0,0,0,.04);--md-fill-strong:rgba(0,0,0,.06);--md-rule:rgba(0,0,0,.1);--md-rule-strong:rgba(0,0,0,.16);--md-link:hsl(210 100% 45%)}}body{background:var(--md-bg);color:var(--md-text);max-width:720px;margin:0 auto;padding:32px;display:flex;flex-direction:column;gap:10px;font:14px/1.55 -apple-system,BlinkMacSystemFont,'SF Pro','Segoe UI',sans-serif;overflow-wrap:break-word}body>:first-child{margin-top:0}h1,h2,h3,h4,h5,h6{margin:6px 0 0;line-height:1.25;font-weight:600;text-wrap:balance}h1{font-size:1.35em}h2{font-size:1.15em;color:var(--md-muted)}h3,h4,h5,h6{font-size:1em}p,ul,ol,blockquote,table,pre,hr{margin:0}strong{font-weight:600}a{color:var(--md-link);text-decoration:none}a:hover{text-decoration:underline}ul,ol{display:flex;flex-direction:column;gap:6px;padding-left:22px}ul{list-style:disc}ol{list-style:decimal}:is(li,td,th)>*+:is(p,ul,ol,blockquote){margin-top:6px}blockquote{display:flex;flex-direction:column;gap:10px;border-left:2px solid var(--md-rule);padding-left:10px;color:var(--md-muted)}:not(pre)>code{background:var(--md-fill);padding:1px 3px;border-radius:4px;font:.92em 'SF Mono',ui-monospace,Menlo,Consolas,monospace}a>code{background:none;color:inherit}pre{background:var(--md-fill);padding:10px 12px;border-radius:6px;overflow-x:auto;font:12px/1.5 'SF Mono',ui-monospace,Menlo,Consolas,monospace;margin-block:4px}pre code{background:none;padding:0;font:inherit}table{width:100%;border-collapse:separate;border-spacing:2px;font:inherit}th,td{padding:6px 8px;border-radius:3px;text-align:left;vertical-align:top}th{background:var(--md-fill-strong);font-weight:600}td{background:var(--md-fill)}:is(th,td) :not(pre)>code{background:transparent}hr{border:0;border-top:1px solid var(--md-rule-strong);margin-block:10px}img{max-width:100%;height:auto;border-radius:4px}</style>
+</head><body>
+<h1>Tổng hợp kỹ thuật — Transformer PhoMT vi→en (600k mẫu)</h1>
+<p>Tài liệu tổng hợp toàn bộ kỹ thuật đang áp dụng trong notebook train Transformer từ đầu trên tập PhoMT, cùng tác dụng cụ thể của từng kỹ thuật.</p>
+<hr>
+<h2>1. Kiến trúc mô hình</h2>
+<table>
+<thead>
+<tr>
+<th>Kỹ thuật</th>
+<th>Vị trí</th>
+<th>Tác dụng</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Transformer chuẩn (Vaswani et al., 2017)</td>
+<td>Cell 5</td>
+<td>6 lớp encoder + 6 lớp decoder, <code>d_model=512</code>, <code>n_heads=8</code>, <code>d_ff=2048</code> — kiến trúc &quot;Transformer-base&quot; đã được kiểm chứng rộng rãi cho bài toán dịch máy</td>
+</tr>
+<tr>
+<td><strong>Pre-LN</strong> (<code>norm_first=True</code>)</td>
+<td>Cell 5</td>
+<td>LayerNorm đặt trước sub-layer thay vì sau (Post-LN gốc) → gradient ổn định hơn khi train từ đầu, giảm rủi ro loss nổ ở giai đoạn warmup. Đánh đổi: mất fastpath <code>nested_tensor</code> tối ưu tốc độ của PyTorch (chỉ hỗ trợ Post-LN)</td>
+</tr>
+<tr>
+<td>Positional Encoding sinusoidal</td>
+<td>Cell 5</td>
+<td>Vector vị trí cố định (không học), cộng vào embedding để mô hình biết thứ tự token</td>
+</tr>
+<tr>
+<td><strong>Dropout sau positional encoding</strong></td>
+<td>Cell 5</td>
+<td><code>p=0.1</code>, đúng chuẩn paper gốc (dropout trên tổng embedding + pos enc) — thêm regularization ngay từ đầu vào</td>
+</tr>
+<tr>
+<td>Embedding scale <code>×√d_model</code></td>
+<td>Cell 5</td>
+<td>Cân bằng độ lớn giữa embedding và positional encoding trước khi cộng</td>
+</tr>
+<tr>
+<td><strong>Weight tying</strong></td>
+<td>Cell 5</td>
+<td><code>src_emb</code>, <code>tgt_emb</code>, <code>out_proj.weight</code> dùng chung 1 ma trận (áp dụng được vì vi/en dùng chung tokenizer) → giảm ~24.6M tham số (≈25% tổng model), giúp train nhanh hơn, đỡ overfit hơn, và học biểu diễn từ vựng nhất quán giữa input/output</td>
+</tr>
+<tr>
+<td>Xavier / normal init có kiểm soát</td>
+<td>Cell 5</td>
+<td>Khởi tạo ma trận transformer bằng Xavier, embedding bằng normal chuẩn hóa theo <code>d_model^-0.5</code>, zero hóa riêng vector của <code>&lt;pad&gt;</code> — giúp train ổn định ngay từ step đầu</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>2. Tokenizer</h2>
+<table>
+<thead>
+<tr>
+<th>Kỹ thuật</th>
+<th>Vị trí</th>
+<th>Tác dụng</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BPE tự train, vocab 24.000</td>
+<td>Cell 4</td>
+<td>Train chung trên cả vi và en → dùng chung 1 tokenizer, là điều kiện để áp dụng weight tying ở trên</td>
+</tr>
+<tr>
+<td><strong>Metaspace pre-tokenizer + decoder</strong></td>
+<td>Cell 4</td>
+<td>Đánh dấu ranh giới từ bằng ký tự <code>▁</code> ngay trong token trước khi tách BPE → khi decode phục hồi đúng 100% dấu cách (đã kiểm chứng bằng test round-trip, in <code>OK</code> cho cả câu Anh và Việt có dấu)</td>
+</tr>
+<tr>
+<td>NFKC normalize + gộp whitespace</td>
+<td>Cell 4</td>
+<td>Chuẩn hóa Unicode và khoảng trắng thừa trước khi tokenize, tránh lệch token do khác biểu diễn ký tự</td>
+</tr>
+<tr>
+<td><strong>BPE-dropout</strong> (bản <code>tokenizer_train</code> riêng)</td>
+<td>Cell 4, dùng ở Cell 6</td>
+<td><code>dropout=0.1</code> khi encode dữ liệu train — random bỏ một số merge rule, tạo nhiều cách tách subword khác nhau cho cùng 1 câu → subword regularization (Provilkov et al., 2020), giúp mô hình generalize tốt hơn. Tokenizer chính (dùng cho valid/test/inference) vẫn giữ deterministic, không dropout</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>3. Tối ưu hóa (Optimizer &amp; Training Dynamics)</h2>
+<table>
+<thead>
+<tr>
+<th>Kỹ thuật</th>
+<th>Vị trí</th>
+<th>Tác dụng</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>AdamW</strong> với tách weight-decay</td>
+<td>Cell 7</td>
+<td><code>betas=(0.9, 0.98)</code>, <code>eps=1e-8</code>; weight-decay <code>0.01</code> cho ma trận ≥2 chiều, <code>0.0</code> cho bias/LayerNorm/embedding — tránh phạt sai các tham số không nên bị co về 0</td>
+</tr>
+<tr>
+<td><strong>Warmup + Inverse-sqrt schedule (Noam)</strong></td>
+<td>Cell 7</td>
+<td><code>lr = peak · min(step/warmup, (warmup/step)^0.5)</code>, <code>WARMUP=4000</code>, <code>PEAK_LR=5e-4</code> — tăng LR tuyến tính đầu để tránh update quá mạnh khi model chưa ổn định, sau đó giảm dần theo 1/√step</td>
+</tr>
+<tr>
+<td><strong>Label smoothing</strong> (<code>0.1</code>)</td>
+<td>Cell 7</td>
+<td>Làm mềm target one-hot, tránh model quá tự tin (overconfident), cải thiện khả năng tổng quát hóa</td>
+</tr>
+<tr>
+<td><strong>Gradient clipping</strong> (norm ≤ 1.0)</td>
+<td>Cell 8</td>
+<td>Chặn gradient bùng nổ đột ngột, giữ training ổn định</td>
+</tr>
+<tr>
+<td><strong>Gradient accumulation</strong> (<code>ACCUM_STEPS=2</code>)</td>
+<td>Cell 7, 8</td>
+<td>Gộp gradient của 2 micro-batch trước khi update — mô phỏng batch lớn hơn mà không tốn thêm VRAM, bù lại việc phải giảm batch size để vừa GPU T4</td>
+</tr>
+<tr>
+<td><strong>Mixed precision (AMP)</strong></td>
+<td>Cell 8</td>
+<td><code>torch.amp.autocast</code> + <code>GradScaler</code> — tính toán ở FP16 giúp tăng tốc và giảm VRAM, đồng thời tự động scale loss để tránh underflow gradient</td>
+</tr>
+<tr>
+<td><strong>NaN/Inf guard</strong></td>
+<td>Cell 8</td>
+<td>Kiểm tra <code>torch.isfinite(loss)</code> trước backward (bỏ batch lỗi, không crash) và kiểm tra <code>grad_norm</code> hữu hạn trước optimizer step (kết hợp với cơ chế tự bỏ update của <code>GradScaler</code> khi FP16 tràn số) — bảo vệ khỏi việc 1 batch lỗi làm hỏng toàn bộ model đã train</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>4. Data Pipeline</h2>
+<table>
+<thead>
+<tr>
+<th>Kỹ thuật</th>
+<th>Vị trí</th>
+<th>Tác dụng</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lọc dữ liệu rác</td>
+<td>Cell 3</td>
+<td>Loại câu rỗng, quá dài (&gt;400 ký tự), tỉ lệ độ dài vi/en bất thường (ngoài 0.5–3.0 lần) — giảm nhiễu từ các cặp câu dịch lỗi/không tương ứng</td>
+</tr>
+<tr>
+<td>Encode một lần, cache ID</td>
+<td>Cell 6</td>
+<td>Tránh tokenize lặp lại ở mỗi epoch, tăng tốc đáng kể vòng lặp train (đặc biệt quan trọng với 600k mẫu × 30 epoch)</td>
+</tr>
+<tr>
+<td><strong>Token-based batching</strong> (<code>MAX_TOKENS=4096</code>)</td>
+<td>Cell 6</td>
+<td>Gom batch theo tổng số token thay vì số câu cố định → tận dụng VRAM đều hơn, vì độ dài câu dao động lớn khiến batch theo số câu có lúc dư, có lúc thiếu tải GPU</td>
+</tr>
+<tr>
+<td><strong>Bucket sorting theo độ dài</strong></td>
+<td>Cell 6</td>
+<td>Sort câu trong từng cụm (chunk) trước khi gom batch → câu độ dài gần nhau nằm cùng batch, giảm lượng padding thừa, tăng tốc train thực tế</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>5. Hạ tầng Train &amp; Checkpoint</h2>
+<table>
+<thead>
+<tr>
+<th>Kỹ thuật</th>
+<th>Vị trí</th>
+<th>Tác dụng</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>DataParallel</strong></td>
+<td>Cell 8</td>
+<td>Tự động chia batch cho nhiều GPU (T4×2) khi phát hiện <code>device_count() &gt; 1</code>, không cần cấu hình thêm</td>
+</tr>
+<tr>
+<td>Checkpoint tự động đẩy lên Kaggle Dataset</td>
+<td>Cell 1</td>
+<td>Tự tạo dataset mới nếu chưa tồn tại, tự update version nếu đã có — đảm bảo checkpoint tồn tại &quot;vĩnh viễn&quot; ngoài phiên Kaggle tạm thời (12h)</td>
+</tr>
+<tr>
+<td><strong>Lưu <code>last.pt</code> mỗi 5 epoch</strong></td>
+<td>Cell 8</td>
+<td>Giảm số lần upload/overhead mạng so với lưu mọi epoch, vẫn đủ dày để không mất quá nhiều tiến độ nếu session bị ngắt</td>
+</tr>
+<tr>
+<td><strong>Lưu riêng <code>best.pt</code> theo valid_nll</strong></td>
+<td>Cell 8</td>
+<td>Theo dõi điểm tốt nhất thực sự, không phụ thuộc epoch có chia hết cho 5 hay không — tránh bỏ lỡ checkpoint tốt nếu nó rơi vào epoch lẻ</td>
+</tr>
+<tr>
+<td>Kiểm tra token Kaggle trước khi train</td>
+<td>Cell 1</td>
+<td><code>kaggle datasets list</code> để fail sớm ngay từ đầu nếu auth sai, tránh train xong mới phát hiện không đẩy được checkpoint</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>6. Suy luận &amp; Đánh giá</h2>
+<table>
+<thead>
+<tr>
+<th>Kỹ thuật</th>
+<th>Vị trí</th>
+<th>Tác dụng</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Beam search vector hóa theo batch</strong></td>
+<td>Cell 13</td>
+<td>Xử lý đồng thời toàn bộ <code>batch × beam</code> bằng tensor operation thay vì lặp từng câu — tăng tốc suy luận đáng kể so với beam search tuần tự</td>
+</tr>
+<tr>
+<td><strong>Length penalty kiểu GNMT</strong></td>
+<td>Cell 13</td>
+<td><code>((5+len+1)/6)^alpha</code>, <code>alpha=0.6</code> — điều chỉnh điểm số theo độ dài, tránh beam search thiên vị chọn câu ngắn (vì log-probability cộng dồn tự nhiên giảm theo độ dài)</td>
+</tr>
+<tr>
+<td>Đo NLL/perplexity thật</td>
+<td>Cell 11</td>
+<td>Tắt label smoothing và dropout (chế độ <code>eval</code>) để đo đúng khả năng thật của model, so sánh train vs valid NLL để theo dõi mức độ overfit qua &quot;gap&quot;</td>
+</tr>
+<tr>
+<td>sacreBLEU chuẩn hóa</td>
+<td>Cell 14</td>
+<td>Đánh giá khách quan, có thể so sánh chéo giữa các nghiên cứu khác; so sánh thêm greedy (<code>beam=1</code>) vs beam search (<code>beam=4</code>) để thấy lợi ích thực tế của beam search</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>Đã cân nhắc nhưng chủ động KHÔNG dùng</h2>
+<table>
+<thead>
+<tr>
+<th>Kỹ thuật</th>
+<th>Lý do không dùng</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Checkpoint averaging</td>
+<td>Không cần thiết cho quy mô hiện tại, tăng độ phức tạp mà lợi ích (~0.3–0.8 BLEU) chưa tương xứng với công sức maintain</td>
+</tr>
+<tr>
+<td>DistributedDataParallel (DDP)</td>
+<td>Cần tách toàn bộ pipeline thành file <code>.py</code> riêng, launch qua <code>torchrun</code> — mất khả năng debug tương tác từng cell trong notebook. Với chỉ 2×T4, lợi ích tốc độ (~20-30%) chưa đủ để đánh đổi workflow hiện tại</td>
+</tr>
+<tr>
+<td><code>torch.compile</code></td>
+<td>Lợi ích thấp trên kiến trúc GPU T4 (Turing, đời cũ) so với GPU Ampere/Hopper, đôi khi gây lỗi khó debug khi kết hợp <code>nn.Transformer</code> + <code>DataParallel</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>Vấn đề còn tồn đọng (không phải kỹ thuật train, nhưng cần lưu ý)</h2>
+<ul>
+<li><strong>Bảo mật</strong>: Cell 1 hiện vẫn hardcode plaintext Kaggle API key trong code — nên thu hồi token cũ và chuyển sang Kaggle Secrets nếu chưa xử lý.</li>
+<li><strong>Deprecation warning</strong>: <code>make_tgt_mask</code> trả về mask kiểu <code>float</code> trong khi <code>make_src_key_padding_mask</code> trả về <code>bool</code> — PyTorch cảnh báo deprecated khi trộn 2 kiểu mask khác nhau. Không ảnh hưởng kết quả hiện tại nhưng có thể cần sửa ở phiên bản PyTorch tương lai.</li>
+</ul>
+
+</body></html>

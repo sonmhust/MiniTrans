@@ -1,0 +1,1137 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dịch Việt–Anh | PhoMT Transformer</title>
+  <meta name="description"
+    content="Công cụ dịch máy Tiếng Việt sang Tiếng Anh dựa trên Transformer tự huấn luyện trên bộ dữ liệu PhoMT 600k, sử dụng Beam Search GNMT.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,500&family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #F1F4F1;
+      --surface: #FFFFFF;
+      --surface-alt: #E9EDE9;
+      --border: #D6DCD5;
+      --ink: #1B2420;
+      --ink-muted: #57635B;
+      --ink-faint: #93A099;
+
+      --teal: #0F6B5C;
+      --teal-dark: #0A5245;
+      --teal-tint: #E2F0EB;
+
+      --amber: #B9752A;
+      --amber-tint: #F8EBDA;
+
+      --green: #3E8E5B;
+      --green-tint: #E5F2E9;
+
+      --red: #AE3D3D;
+      --red-tint: #F7E9E9;
+
+      --radius-lg: 16px;
+      --radius: 10px;
+      --radius-sm: 7px;
+
+      --shadow-sm: 0 1px 2px rgba(20, 28, 24, 0.06);
+      --shadow-md: 0 6px 20px rgba(20, 28, 24, 0.09);
+
+      --font-display: 'Newsreader', Georgia, 'Times New Roman', serif;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+      --transition: 0.18s ease;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* brand bar */
+    .brand-bar {
+      display: flex;
+      height: 4px;
+      width: 100%;
+    }
+
+    .brand-bar span {
+      flex: 1;
+    }
+
+    .brand-bar span:first-child {
+      background: var(--teal);
+    }
+
+    .brand-bar span:last-child {
+      background: var(--amber);
+    }
+
+    /* header */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 0;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .logo-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      position: relative;
+      overflow: hidden;
+      background: var(--teal);
+      flex-shrink: 0;
+    }
+
+    .logo-mark::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--amber);
+      clip-path: polygon(100% 0, 100% 100%, 0 100%);
+    }
+
+    .logo-text {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.2;
+    }
+
+    .logo-text .name {
+      font-weight: 700;
+      font-size: 1.02rem;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+    }
+
+    .logo-text .sub {
+      font-size: 0.72rem;
+      color: var(--ink-faint);
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 13px;
+      border-radius: 100px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      color: var(--ink-muted);
+      transition: var(--transition);
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--ink-faint);
+      flex-shrink: 0;
+    }
+
+    .status-badge.online .status-dot {
+      background: var(--green);
+    }
+
+    .status-badge.loading .status-dot {
+      background: var(--amber);
+      animation: pulse-dot 1.4s ease-in-out infinite;
+    }
+
+    .status-badge.error .status-dot {
+      background: var(--red);
+    }
+
+    @keyframes pulse-dot {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.35;
+      }
+    }
+
+    /* hero */
+    .hero {
+      padding: 56px 0 40px;
+    }
+
+    .hero-kicker {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--amber);
+      margin-bottom: 14px;
+    }
+
+    .hero h1 {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-weight: 500;
+      font-size: clamp(2rem, 4.4vw, 3rem);
+      line-height: 1.18;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+      max-width: 14ch;
+      margin-bottom: 18px;
+    }
+
+    .hero-lede {
+      font-size: 1.02rem;
+      color: var(--ink-muted);
+      max-width: 56ch;
+      margin-bottom: 36px;
+    }
+
+    .stats-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0;
+      border-top: 1px solid var(--border);
+      padding-top: 22px;
+    }
+
+    .stat {
+      flex: 1 1 180px;
+      padding: 0 22px 10px 0;
+      border-left: 1px solid var(--border);
+      padding-left: 22px;
+    }
+
+    .stat:first-child {
+      border-left: none;
+      padding-left: 0;
+    }
+
+    .stat-value {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--ink);
+      letter-spacing: -0.01em;
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--ink-muted);
+      margin-top: 3px;
+    }
+
+    /* translator */
+    .translator-section {
+      padding: 8px 0 64px;
+    }
+
+    .translator-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 14px 20px;
+      background: var(--surface-alt);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .lang-pair {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.88rem;
+      font-weight: 600;
+    }
+
+    .lang-tag {
+      padding: 4px 11px;
+      border-radius: 100px;
+      background: var(--teal-tint);
+      color: var(--teal-dark);
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+
+    .lang-arrow {
+      color: var(--ink-faint);
+      font-size: 1rem;
+    }
+
+    .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .beam-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.82rem;
+      color: var(--ink-muted);
+    }
+
+    .beam-select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--ink);
+      padding: 5px 9px;
+      font-size: 0.82rem;
+      font-family: inherit;
+      cursor: pointer;
+      outline: none;
+      transition: var(--transition);
+    }
+
+    .beam-select:hover {
+      border-color: var(--teal);
+    }
+
+    .beam-select:focus-visible {
+      outline: 2px solid var(--teal);
+      outline-offset: 1px;
+    }
+
+    .char-counter {
+      font-size: 0.78rem;
+      color: var(--ink-faint);
+    }
+
+    .panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 300px;
+    }
+
+    @media (max-width: 760px) {
+      .panels {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel+.panel {
+      border-left: 1px solid var(--border);
+    }
+
+    @media (max-width: 760px) {
+      .panel+.panel {
+        border-left: none;
+        border-top: 1px solid var(--border);
+      }
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 18px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--ink-muted);
+    }
+
+    .panel-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .text-btn {
+      padding: 4px 11px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink-muted);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.76rem;
+      font-weight: 500;
+      transition: var(--transition);
+      outline: none;
+    }
+
+    .text-btn:hover {
+      border-color: var(--teal);
+      color: var(--teal-dark);
+    }
+
+    .text-btn:active {
+      transform: scale(0.96);
+    }
+
+    .text-btn.success {
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    .text-btn:focus-visible {
+      outline: 2px solid var(--teal);
+      outline-offset: 1px;
+    }
+
+    textarea {
+      flex: 1;
+      width: 100%;
+      resize: none;
+      min-height: 240px;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--ink);
+      font-family: inherit;
+      font-size: 1rem;
+      line-height: 1.75;
+      padding: 20px;
+      caret-color: var(--teal);
+    }
+
+    textarea::placeholder {
+      color: var(--ink-faint);
+    }
+
+    .output-text {
+      flex: 1;
+      padding: 20px;
+      font-size: 1rem;
+      line-height: 1.75;
+      color: var(--ink);
+      min-height: 240px;
+      white-space: pre-wrap;
+    }
+
+    .output-placeholder {
+      color: var(--ink-faint);
+      font-style: italic;
+    }
+
+    .shimmer {
+      display: none;
+      flex: 1;
+      padding: 20px;
+    }
+
+    .shimmer.active {
+      display: block;
+    }
+
+    .shimmer-line {
+      height: 15px;
+      border-radius: 5px;
+      margin-bottom: 13px;
+      background: var(--surface-alt);
+      animation: pulse-line 1.3s ease-in-out infinite;
+    }
+
+    .shimmer-line:nth-child(2) {
+      width: 88%;
+    }
+
+    .shimmer-line:nth-child(3) {
+      width: 62%;
+      animation-delay: 0.15s;
+    }
+
+    .shimmer-line:nth-child(4) {
+      width: 74%;
+      animation-delay: 0.3s;
+    }
+
+    @keyframes pulse-line {
+
+      0%,
+      100% {
+        opacity: 0.6;
+      }
+
+      50% {
+        opacity: 1;
+      }
+    }
+
+    .action-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .translate-btn {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 11px 24px;
+      border-radius: var(--radius);
+      border: none;
+      background: var(--teal);
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.94rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      outline: none;
+    }
+
+    .translate-btn:hover {
+      background: var(--teal-dark);
+    }
+
+    .translate-btn:active {
+      transform: scale(0.98);
+    }
+
+    .translate-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .translate-btn:focus-visible {
+      outline: 2px solid var(--teal-dark);
+      outline-offset: 2px;
+    }
+
+    .btn-icon-wrap {
+      display: inline-flex;
+      width: 16px;
+      height: 16px;
+    }
+
+    .icon-spinner {
+      display: none;
+    }
+
+    .translate-btn.loading .icon-arrow {
+      display: none;
+    }
+
+    .translate-btn.loading .icon-spinner {
+      display: inline-flex;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .shortcut-hint {
+      font-size: 0.76rem;
+      color: var(--ink-faint);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    kbd {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-size: 0.72rem;
+      font-family: inherit;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      color: var(--ink-muted);
+    }
+
+    .meta-info {
+      font-size: 0.78rem;
+      color: var(--ink-muted);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .meta-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .meta-chip .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      display: inline-block;
+    }
+
+    .meta-chip .dot.cpu {
+      background: var(--amber);
+    }
+
+    /* examples */
+    .examples-section {
+      margin-top: 30px;
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+
+    .section-desc {
+      font-size: 0.9rem;
+      color: var(--ink-muted);
+      margin-bottom: 16px;
+    }
+
+    .examples-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+    }
+
+    .example-pill {
+      padding: 8px 15px;
+      border-radius: 100px;
+      font-size: 0.85rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--ink-muted);
+      cursor: pointer;
+      transition: var(--transition);
+      outline: none;
+      max-width: 420px;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .example-pill:hover {
+      background: var(--teal-tint);
+      border-color: var(--teal);
+      color: var(--teal-dark);
+    }
+
+    .example-pill:focus-visible {
+      outline: 2px solid var(--teal);
+      outline-offset: 1px;
+    }
+
+    /* toast */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-width: 320px;
+    }
+
+    .toast {
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      font-weight: 500;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--ink-faint);
+      box-shadow: var(--shadow-md);
+      color: var(--ink);
+      animation: toast-in 0.25s ease forwards;
+    }
+
+    .toast.success {
+      border-left-color: var(--green);
+    }
+
+    .toast.error {
+      border-left-color: var(--red);
+    }
+
+    .toast.info {
+      border-left-color: var(--teal);
+    }
+
+    @keyframes toast-in {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 22px 0;
+    }
+
+    footer p {
+      font-size: 0.8rem;
+      color: var(--ink-faint);
+    }
+
+    footer a {
+      color: var(--teal-dark);
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+    }
+
+    footer a:hover {
+      border-bottom-color: var(--teal-dark);
+    }
+
+    /* misc */
+    ::-webkit-scrollbar {
+      width: 7px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+
+    .error-msg {
+      color: var(--red);
+      font-size: 0.92rem;
+      padding: 4px 0;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--teal);
+      outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="brand-bar"><span></span><span></span></div>
+
+  <!-- Header -->
+  <header>
+    <div class="container">
+      <div class="header-inner">
+        <a href="#" class="logo">
+          <div class="logo-mark"></div>
+          <div class="logo-text">
+            <span class="name">Dịch Việt–Anh</span>
+            <span class="sub">PhoMT Transformer</span>
+          </div>
+        </a>
+        <div id="statusBadge" class="status-badge loading">
+          <div class="status-dot"></div>
+          <span id="statusText">Đang khởi động…</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-kicker">Dịch máy bằng mô hình Transformer</div>
+      <h1>MiniTrans</h1>
+      <p class="hero-lede">Mô hình được tự huấn luyện trên 600.000 cặp câu của bộ dữ liệu PhoMT, tạo bản dịch bằng
+        phương pháp Beam Search kèm Length Penalty.</p>
+
+      <div class="stats-row">
+        <div class="stat">
+          <div class="stat-value">600.000</div>
+          <div class="stat-label">Cặp câu huấn luyện</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">56,5 triệu</div>
+          <div class="stat-label">Tham số mô hình</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">6L · 8H · 512d</div>
+          <div class="stat-label">Kiến trúc Transformer-Base</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">24.000</div>
+          <div class="stat-label">Từ vựng BPE</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main translator -->
+  <main>
+    <div class="container">
+      <div class="translator-section">
+        <div class="translator-card">
+
+          <!-- Toolbar -->
+          <div class="toolbar">
+            <div class="lang-pair">
+              <span class="lang-tag">Tiếng Việt</span>
+              <span class="lang-arrow">→</span>
+              <span class="lang-tag">English</span>
+            </div>
+            <div class="toolbar-right">
+              <div class="beam-control">
+                <span>Độ rộng beam</span>
+                <select id="beamSelect" class="beam-select"
+                  title="Beam search — số lớn hơn cho kết quả chính xác hơn nhưng chậm hơn">
+                  <option value="1">1 (Greedy)</option>
+                  <option value="2">2</option>
+                  <option value="4" selected>4 (Cân bằng)</option>
+                  <option value="6">6</option>
+                  <option value="8">8 (Chất lượng cao)</option>
+                </select>
+              </div>
+              <div class="char-counter" id="charCounter">0 ký tự</div>
+            </div>
+          </div>
+
+          <!-- Panels -->
+          <div class="panels">
+            <div class="panel">
+              <div class="panel-header">
+                <span>Văn bản nguồn</span>
+                <div class="panel-actions">
+                  <button id="btnPasteInput" class="text-btn">Dán</button>
+                  <button id="btnClearInput" class="text-btn">Xóa</button>
+                </div>
+              </div>
+              <textarea id="inputText"
+                placeholder="Nhập văn bản tiếng Việt cần dịch…&#10;&#10;Ví dụ: Hôm nay trời đẹp, chúng ta đi chơi nhé!"
+                spellcheck="false" autocomplete="off" maxlength="5000"
+                aria-label="Văn bản tiếng Việt cần dịch"></textarea>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <span>Bản dịch</span>
+                <div class="panel-actions">
+                  <button id="btnCopyOutput" class="text-btn">Chép</button>
+                  <button id="btnClearOutput" class="text-btn">Xóa</button>
+                </div>
+              </div>
+              <div class="shimmer" id="shimmer">
+                <div class="shimmer-line"></div>
+                <div class="shimmer-line"></div>
+                <div class="shimmer-line"></div>
+                <div class="shimmer-line"></div>
+              </div>
+              <div id="outputText" class="output-text">
+                <span class="output-placeholder">Bản dịch sẽ xuất hiện ở đây…</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action bar -->
+          <div class="action-bar">
+            <button id="translateBtn" class="translate-btn">
+              <span class="btn-icon-wrap">
+                <svg class="icon-arrow" width="16" height="16" viewBox="0 0 16 16" fill="none"
+                  xmlns="http://www.w3.org/2000/svg">
+                  <path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+                    stroke-linejoin="round" />
+                </svg>
+                <svg class="icon-spinner" width="16" height="16" viewBox="0 0 16 16" fill="none"
+                  xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+                    stroke-dasharray="26" stroke-dashoffset="8" />
+                </svg>
+              </span>
+              <span id="btnLabel">Dịch ngay</span>
+            </button>
+            <div class="shortcut-hint">Phím tắt <kbd>Ctrl</kbd> + <kbd>Enter</kbd></div>
+            <div class="meta-info" id="metaInfo" style="display:none;">
+              <div class="meta-chip">
+                <span class="dot" id="deviceDot"></span>
+                <span id="deviceLabel">CPU</span>
+              </div>
+              <div class="meta-chip">Thời gian <span id="timeLabel">—</span></div>
+              <div class="meta-chip">Số câu <span id="sentLabel">—</span></div>
+            </div>
+          </div>
+
+        </div><!-- /.translator-card -->
+
+        <!-- Examples -->
+        <div class="examples-section">
+          <div class="section-title">Câu mẫu</div>
+          <p class="section-desc">Chọn một câu bên dưới để chèn nhanh vào ô nhập.</p>
+          <div class="examples-grid" id="examplesGrid"></div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>PhoMT Transformer Vi→En. Huấn luyện trên <a href="https://github.com/ura-hcmut/PhoMT" target="_blank"
+          rel="noopener">bộ dữ liệu PhoMT</a> với kiến trúc Pre-LN qua 30 epoch. <a href="#" id="footerModelInfo">Xem
+          thông tin mô hình</a></p>
+    </div>
+  </footer>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    let isTranslating = false;
+    let statusInterval = null;
+
+    const EXAMPLES = [
+      "Hôm nay trời đẹp, chúng ta đi chơi nhé!",
+      "Ngày 14, tháng 8, năm 1947, gần nửa đêm, ở Bombay, có một phụ nữ sắp lâm bồn.",
+      "Tôi đang học dịch máy tại Đại học Khoa học Tự nhiên TP.HCM.",
+      "Các nhà khoa học đã phát hiện ra một loại thuốc mới có thể chữa trị bệnh tiểu đường.",
+      "Chính phủ Việt Nam đã công bố kế hoạch phát triển kinh tế số đến năm 2030.",
+      "Anh ấy nói rằng anh ấy sẽ đến vào ngày mai để giúp tôi sửa máy tính.",
+      "Thời tiết hôm nay rất lạnh, nhiệt độ xuống đến 15 độ Celsius.",
+      "Chiếc điện thoại thông minh này có màn hình lớn và pin bền.",
+      "Em bé mới sinh đang ngủ ngon trong nôi.",
+      "Trận bóng đá tối nay giữa Việt Nam và Thái Lan rất hấp dẫn.",
+    ];
+
+    const inputEl = document.getElementById('inputText');
+    const outputEl = document.getElementById('outputText');
+    const shimmerEl = document.getElementById('shimmer');
+    const translateBtn = document.getElementById('translateBtn');
+    const btnLabel = document.getElementById('btnLabel');
+    const charCounter = document.getElementById('charCounter');
+    const statusBadge = document.getElementById('statusBadge');
+    const statusText = document.getElementById('statusText');
+    const metaInfo = document.getElementById('metaInfo');
+    const deviceDot = document.getElementById('deviceDot');
+    const deviceLabel = document.getElementById('deviceLabel');
+    const timeLabel = document.getElementById('timeLabel');
+    const sentLabel = document.getElementById('sentLabel');
+    const beamSelect = document.getElementById('beamSelect');
+
+    const grid = document.getElementById('examplesGrid');
+    EXAMPLES.forEach(ex => {
+      const btn = document.createElement('button');
+      btn.className = 'example-pill';
+      btn.textContent = ex;
+      btn.title = ex;
+      btn.addEventListener('click', () => {
+        inputEl.value = ex;
+        updateCharCounter();
+        inputEl.focus();
+        showToast('Đã chèn câu mẫu', 'info');
+      });
+      grid.appendChild(btn);
+    });
+
+    function updateCharCounter() {
+      const n = inputEl.value.length;
+      charCounter.textContent = n.toLocaleString('vi') + ' ký tự';
+      charCounter.style.color = n > 4000 ? 'var(--red)' : n > 3000 ? 'var(--amber)' : 'var(--ink-faint)';
+    }
+
+    function showToast(msg, type = 'info', duration = 3000) {
+      const tc = document.getElementById('toastContainer');
+      const t = document.createElement('div');
+      t.className = `toast ${type}`;
+      t.textContent = msg;
+      tc.appendChild(t);
+      setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(8px)'; t.style.transition = '0.25s'; setTimeout(() => t.remove(), 250); }, duration);
+    }
+
+    function setLoading(on) {
+      isTranslating = on;
+      translateBtn.disabled = on;
+      if (on) {
+        btnLabel.textContent = 'Đang dịch…';
+        translateBtn.classList.add('loading');
+        shimmerEl.classList.add('active');
+        outputEl.style.display = 'none';
+      } else {
+        btnLabel.textContent = 'Dịch ngay';
+        translateBtn.classList.remove('loading');
+        shimmerEl.classList.remove('active');
+        outputEl.style.display = '';
+      }
+    }
+
+    async function checkStatus() {
+      try {
+        const r = await fetch('/status');
+        const d = await r.json();
+        if (d.model_loaded) {
+          statusBadge.className = 'status-badge online';
+          const gpu = d.gpu ? d.gpu.replace('NVIDIA GeForce ', '') : null;
+          statusText.textContent = gpu ? `GPU: ${gpu}` : 'Chế độ CPU';
+          clearInterval(statusInterval);
+          deviceDot.className = 'dot' + (d.cuda ? '' : ' cpu');
+          deviceLabel.textContent = d.cuda ? (gpu || 'CUDA') : 'CPU';
+        } else {
+          statusBadge.className = 'status-badge loading';
+          statusText.textContent = 'Đang tải mô hình…';
+        }
+      } catch (e) {
+        statusBadge.className = 'status-badge error';
+        statusText.textContent = 'Mất kết nối';
+      }
+    }
+    checkStatus();
+    statusInterval = setInterval(checkStatus, 3000);
+
+    async function translate() {
+      if (isTranslating) return;
+      const text = inputEl.value.trim();
+      if (!text) { showToast('Vui lòng nhập văn bản cần dịch', 'error'); inputEl.focus(); return; }
+
+      setLoading(true);
+      metaInfo.style.display = 'none';
+      const t0 = Date.now();
+
+      try {
+        const beam = parseInt(beamSelect.value);
+        const res = await fetch('/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, beam }),
+        });
+        const d = await res.json();
+        const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+
+        if (d.error) {
+          outputEl.innerHTML = `<span class="error-msg">Lỗi: ${d.error}</span>`;
+          showToast('Lỗi dịch thuật: ' + d.error, 'error');
+        } else {
+          outputEl.textContent = d.translation;
+          timeLabel.textContent = elapsed + 's';
+          sentLabel.textContent = d.sentences + ' câu';
+          metaInfo.style.display = 'flex';
+          if (d.sentences > 0) showToast(`Dịch xong ${d.sentences} câu trong ${elapsed}s`, 'success');
+        }
+      } catch (e) {
+        outputEl.innerHTML = `<span class="error-msg">Không kết nối được máy chủ. Hãy chắc chắn app.py đang chạy.</span>`;
+        showToast('Lỗi kết nối máy chủ', 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    translateBtn.addEventListener('click', translate);
+    inputEl.addEventListener('input', updateCharCounter);
+    inputEl.addEventListener('keydown', e => {
+      if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); translate(); }
+    });
+
+    document.getElementById('btnClearInput').addEventListener('click', () => {
+      inputEl.value = ''; updateCharCounter(); inputEl.focus();
+      showToast('Đã xóa văn bản nguồn', 'info', 2000);
+    });
+
+    document.getElementById('btnPasteInput').addEventListener('click', async () => {
+      try {
+        const t = await navigator.clipboard.readText();
+        inputEl.value = t; updateCharCounter(); inputEl.focus();
+        showToast('Đã dán từ clipboard', 'success', 2000);
+      } catch (e) { showToast('Không thể dán — hãy dán thủ công', 'error'); }
+    });
+
+    document.getElementById('btnCopyOutput').addEventListener('click', async () => {
+      const text = outputEl.textContent.trim();
+      if (!text || text.includes('Bản dịch sẽ')) { showToast('Chưa có bản dịch để sao chép', 'error', 2000); return; }
+      try {
+        await navigator.clipboard.writeText(text);
+        const btn = document.getElementById('btnCopyOutput');
+        const original = btn.textContent;
+        btn.textContent = 'Đã chép'; btn.classList.add('success');
+        setTimeout(() => { btn.textContent = original; btn.classList.remove('success'); }, 1500);
+        showToast('Đã sao chép bản dịch', 'success', 2000);
+      } catch (e) { showToast('Không thể sao chép', 'error'); }
+    });
+
+    document.getElementById('btnClearOutput').addEventListener('click', () => {
+      outputEl.innerHTML = '<span class="output-placeholder">Bản dịch sẽ xuất hiện ở đây…</span>';
+      metaInfo.style.display = 'none';
+    });
+
+    document.getElementById('footerModelInfo').addEventListener('click', e => {
+      e.preventDefault();
+      showToast('Transformer Pre-LN, d=512, 8 heads, 6 layers, BPE 24k, valid NLL ≈2.09 (PPL ≈8.07)', 'info', 6000);
+    });
+
+    updateCharCounter();
+  </script>
+</body>
+
+</html>
