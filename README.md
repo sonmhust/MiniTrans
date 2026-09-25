@@ -128,18 +128,46 @@ MiniTrans/
 └── README.md
 ```
 
-The model weights file `best.pt` (~216 MB) is excluded from the repository. Download it from [Kaggle](https://www.kaggle.com/datasets/maihongsn/transformer-phomt-600k-ckpt) and place it in the project root before running.
+The model weights (`best.pt`, ~216 MB) are not stored in this repository. Download them from Kaggle and place the file in the project root before running.
+
+**Download:** https://www.kaggle.com/datasets/maihongsn/transformer-phomt-600k-ckpt
 
 ---
 
 ## Setup
 
+**1. Clone the repository**
+
 ```bash
-# Install dependencies
+git clone https://github.com/sonmhust/MiniTrans.git
+cd MiniTrans
+```
+
+**2. Install dependencies**
+
+```bash
+# With CUDA (recommended, requires CUDA 12.4)
 pip install torch --index-url https://download.pytorch.org/whl/cu124
 pip install tokenizers flask
 
-# Run the server
+# CPU only
+pip install torch tokenizers flask
+```
+
+**3. Download model weights**
+
+Download `best.pt` from https://www.kaggle.com/datasets/maihongsn/transformer-phomt-600k-ckpt and place it in the project root.
+
+```
+MiniTrans/
+├── best.pt   <-- place here
+├── app.py
+└── ...
+```
+
+**4. Run the server**
+
+```bash
 python app.py
 ```
 
